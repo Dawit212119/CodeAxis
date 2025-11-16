@@ -1,0 +1,369 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        UserRole @default(CLIENT)
+  avatar      String?
+  isVerified  Boolean  @default(false)
+  lastActiveAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Profile information
+  profile     UserProfile?
+  stats       UserStats?
+
+  // Relations
+  clientProjects     Project[] @relation("ClientProjects")
+  freelancerProjects Project[] @relation("FreelancerProjects")
+  sentMessages       Message[] @relation("SentMessages")
+  receivedMessages   Message[] @relation("ReceivedMessages")
+  instructorCourses  Course[]  @relation("InstructorCourses")
+  enrollments        Enrollment[]
+  proposals          Proposal[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  isComplete    Boolean  @default(false)
+  bio           String?
+  location      String?
+  website       String?
+  skills        String[] @default([])
+  experience    String?
+  hourlyRate    Float?
+  availability  Availability? @default(AVAILABLE)
+  timezone      String?
+  languages     String[] @default([])
+  certifications String[] @default([])
+
+  @@map("user_profiles")
+}
+
+model UserStats {
+  id               String @id @default(cuid())
+  userId           String @unique
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalProjects    Int    @default(0)
+  completedProjects Int   @default(0)
+  totalHours       Int    @default(0)
+  rating           Float  @default(0)
+  reviewCount      Int    @default(0)
+
+  @@map("user_stats")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  clientId    String
+  freelancerId String?
+  status      ProjectStatus @default(DRAFT)
+  category    String
+  skills      String[]      @default([])
+  priority    Priority      @default(MEDIUM)
+  tags        String[]      @default([])
+  isUrgent    Boolean       @default(false)
+  isFeatured  Boolean       @default(false)
+  viewCount   Int           @default(0)
+  applicantCount Int        @default(0)
+  progress    Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Budget information
+  budgetType     BudgetType
+  budgetAmount   Float
+  budgetCurrency String     @default("USD")
+
+  // Timeline
+  estimatedDuration Int
+  startDate        DateTime?
+  endDate          DateTime?
+  deadline         DateTime?
+
+  // Payment tracking
+  totalPaid      Float @default(0)
+  pendingAmount  Float @default(0)
+  paymentMethod  String?
+
+  // Ratings
+  clientRating     Float?
+  freelancerRating Float?
+  clientReview     String?
+  freelancerReview String?
+
+  // Relations
+  client      User       @relation("ClientProjects", fields: [clientId], references: [id])
+  freelancer  User?      @relation("FreelancerProjects", fields: [freelancerId], references: [id])
+  attachments Attachment[]
+  proposals   Proposal[]
+  milestones  Milestone[]
+  messages    Message[]
+
+  @@map("projects")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  name      String
+  url       String
+  type      String
+  size      Int
+  uploadedAt DateTime @default(now())
+
+  @@map("attachments")
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String
+  amount      Float
+  dueDate     DateTime
+  status      MilestoneStatus @default(PENDING)
+  completedAt DateTime?
+
+  @@map("milestones")
+}
+
+model Proposal {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancerId String
+  freelancer User     @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  
+  coverLetter String
+  proposedRate Float
+  estimatedDuration Int
+  status     ProposalStatus @default(PENDING)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("proposals")
+}
+
+model Course {
+  id               String   @id @default(cuid())
+  title            String
+  slug             String   @unique
+  description      String
+  shortDescription String
+  instructorId     String
+  instructor       User     @relation("InstructorCourses", fields: [instructorId], references: [id])
+  
+  category         String
+  subcategory      String
+  level            CourseLevel
+  language         String   @default("English")
+  thumbnail        String
+  previewVideo     String?
+  
+  price            Float
+  originalPrice    Float?
+  currency         String   @default("USD")
+  
+  isPublished      Boolean  @default(false)
+  isFeatured       Boolean  @default(false)
+  duration         Int      // in minutes
+  certificate      Boolean  @default(false)
+  hasSubtitles     Boolean  @default(false)
+  
+  requirements     String[] @default([])
+  whatYouWillLearn String[] @default([])
+  targetAudience   String[] @default([])
+  tags             String[] @default([])
+  
+  ratingAverage    Float    @default(0)
+  ratingCount      Int      @default(0)
+  enrollmentCount  Int      @default(0)
+  enrollmentCapacity Int?
+  
+  lastUpdated      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  lessons      Lesson[]
+  enrollments  Enrollment[]
+
+  @@map("courses")
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  videoUrl    String?
+  duration    Int      // in minutes
+  order       Int
+  isFree      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  resources   LessonResource[]
+
+  @@map("lessons")
+}
+
+model LessonResource {
+  id       String      @id @default(cuid())
+  lessonId String
+  lesson   Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  title    String
+  type     ResourceType
+  url      String
+
+  @@map("lesson_resources")
+}
+
+model Enrollment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  progress    Int      @default(0)
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  senderId    String
+  sender      User        @relation("SentMessages", fields: [senderId], references: [id])
+  recipientId String
+  recipient   User        @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  projectId   String?
+  project     Project?    @relation(fields: [projectId], references: [id])
+  
+  content     String
+  type        MessageType @default(TEXT)
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  
+  isRead      Boolean     @default(false)
+  readAt      DateTime?
+  isEdited    Boolean     @default(false)
+  editedAt    DateTime?
+  replyToId   String?
+  replyTo     Message?    @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies     Message[]   @relation("MessageReplies")
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("messages")
+}
+
+// Enums
+enum UserRole {
+  CLIENT
+  FREELANCER
+  STUDENT
+  ADMIN
+}
+
+enum Availability {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
+enum ProjectStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+  PAUSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum BudgetType {
+  FIXED
+  HOURLY
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  IMAGE
+  SYSTEM
+}
+
+enum ResourceType {
+  PDF
+  VIDEO
+  LINK
+  FILE
+}
